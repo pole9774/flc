@@ -1,0 +1,167 @@
+/*************************
+ Parser
+**************************/
+
+import java_cup.runtime.*;
+import java.util.*;
+import java.io.*;
+
+init with {:
+	symbol_table = new HashMap();
+:};
+
+parser code 	{:
+    public static HashMap symbol_table;
+    
+    public void report_error(String message, Object info) {
+        StringBuffer m = new StringBuffer(message);
+        if (info instanceof Symbol) {
+            if (((Symbol)info).left != 1 && ((Symbol)info).right != 1) {
+                if (((Symbol)info).left != -1 && ((Symbol)info).right != -1) {
+                    int line = (((Symbol)info).left) + 1;
+                    int column = (((Symbol)info).right) + 1;
+                    m.append(" (line " + line + " column " + column + ")");
+                }
+            }
+            System.err.println(m);
+        }
+    }
+    
+    public Object stack(int position) {
+        return (((Symbol)stack.elementAt(tos + position)).value);
+    }
+:};
+
+action code {:
+    class Attrib {
+        private Double price;
+        private Integer quantity;
+        
+        Attrib(Double price, Integer quantity){
+            this.price = price;
+            this.quantity = quantity;
+        }
+	
+        Double getPrice(){
+            return this.price;
+        }
+        Integer getQuantity(){
+            return this.quantity;
+        }
+    };
+:};
+
+
+
+//////////////////////////////////
+///// SYMBOLS DECLARATION
+/////////////////////////////////
+
+terminal TOKEN1, TOKEN2, TOKEN3, QSTRING, UINT, DOUBLE;
+terminal SEP, MINUS, S, CM, EURO, PERC;
+
+non terminal prog, header_section, header1, header2, list_token1, rep_token2;
+non terminal list_13;
+non terminal dresses_section, dresses_list, dress;
+non terminal HashMap prod_list;
+non terminal shopping_section, purch_list, purch;
+non terminal String dress_name;
+non terminal Attrib dress_types;
+
+
+//////////////////////////////////
+///// GRAMMAR
+/////////////////////////////////
+
+start with prog;
+
+prog ::= header_section SEP dresses_section SEP shopping_section
+;
+
+header_section ::= header1 | header2
+;
+
+header1 ::= list_token1 rep_token2 |
+            list_token1 rep_token2 rep_token2 rep_token2 |
+            list_token1 rep_token2 rep_token2 rep_token2 TOKEN2 S
+;
+
+list_token1 ::= list_token1 TOKEN1 S TOKEN1 S | TOKEN1 S TOKEN1 S TOKEN1 S
+;
+
+rep_token2 ::= TOKEN2 S TOKEN2 S TOKEN2 S
+;
+
+header2 ::= TOKEN2 S list_13 |
+            TOKEN2 S TOKEN2 S list_13 |
+            TOKEN2 S list_13 TOKEN2 S |
+            TOKEN2 S list_13 TOKEN2 S list_13
+;
+
+list_13 ::= TOKEN1 S | TOKEN3 S | list_13 TOKEN1 S | list_13 TOKEN3 S
+;
+
+
+dresses_section ::= dresses_list
+;
+
+dresses_list ::= dress | dresses_list dress
+;
+
+dress ::= QSTRING:x MINUS prod_list:y S 
+          {:
+            parser.symbol_table.put((String)x, y);
+          :}
+;
+
+prod_list ::= UINT QSTRING:x DOUBLE:y EURO 
+              {:
+                HashMap hash = new HashMap();
+	       		hash.put((String)x, (Double)y);
+	       		RESULT = hash;
+              :} | 
+              prod_list:h CM UINT QSTRING:x DOUBLE:y EURO 
+              {:
+                h.put((String)x, (Double)y);
+                RESULT = h;
+              :}
+;
+
+shopping_section ::= purch_list
+;
+
+purch_list ::= purch | purch_list purch
+;
+
+purch ::=   dress_name UINT PERC MINUS dress_types:x S
+            {:
+                System.out.println("TOTAL: " + x.getPrice() + " euro N_PROD: " + x.getQuantity());
+            :}
+;
+
+dress_name ::=  QSTRING:x 
+                {:
+                    System.out.println((String)x);
+                    RESULT = (String)x;
+                :}
+;
+
+dress_types ::= QSTRING:x UINT:y 
+                {:
+                    String dressName = (String)parser.stack(-5);
+                    Integer perc = (Integer)parser.stack(-4);
+                    HashMap h = (HashMap)parser.symbol_table.get(dressName);
+                    Double price = (Double)h.get(x) * (Integer)y * perc / 100;
+                    System.out.println((String)x + " " + price + " euro");
+                    RESULT = new Attrib(price, (Integer)y);
+                :} |
+                dress_types:r CM QSTRING:x UINT:y
+                {:
+                    String dressName = (String)parser.stack(-7);
+                    Integer perc = (Integer)parser.stack(-6);
+                    HashMap h = (HashMap)parser.symbol_table.get(dressName);
+                    Double price = (Double)h.get(x) * (Integer)y * perc / 100;
+                    System.out.println((String)x + " " + price + " euro");
+                    RESULT = new Attrib(price + r.getPrice(), (Integer)y + r.getQuantity());
+                :}
+;
