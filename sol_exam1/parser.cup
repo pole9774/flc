@@ -1,25 +1,33 @@
 import java_cup.runtime.*;
 import java.util.*;
-
-/* In this solution the possibility to give the score of 1 to the attributes not listed was not handled */
+import java.io.*;
 
 init with {:
-    classHash = new HashMap();
-
-    System.out.println("Achieved scores.\n");
+	symbol_table = new HashMap();
+    System.out.println("Achieved scores:");
 :};
-
 
 parser code {:
-    public static HashMap classHash;
+    public static HashMap symbol_table;
     
-    /* Return semantic value of symbol in position (position) */
-    public Object stack(int position) {
-        return (((Symbol)stack.elementAt(tos+position)).value);
+    public void report_error(String message, Object info) {
+        StringBuffer m = new StringBuffer(message);
+        if (info instanceof Symbol) {
+            if (((Symbol)info).left != 1 && ((Symbol)info).right != 1) {
+                if (((Symbol)info).left != -1 && ((Symbol)info).right != -1) {
+                    int line = (((Symbol)info).left) + 1;
+                    int column = (((Symbol)info).right) + 1;
+                    m.append(" (line " + line + " column " + column + ")");
+                }
+            }
+            System.err.println(m);
+        }
     }
-
+    
+    public Object stack(int position) {
+        return (((Symbol)stack.elementAt(tos + position)).value);
+    }
 :};
-
 
 action code {:
     class Attrib {
@@ -34,155 +42,109 @@ action code {:
         String getName(){
             return this.name;
         }
+
         Integer getWeight(){
             return this.weight;
         }
-
     };
 :};
 
-      
-terminal ARROW, MINUS, PLUS, DIV, STAR, OB, CB, SC, C, D, DD, EQ;
-terminal String WORD, ID;
-terminal Integer NUMBER;
 
-non terminal prog, definitions, definition, descriptions, description, sentence;
+terminal RO, RC, C, ARR, CM, DOT, STAR, PLUS, DIV, MIN, S, EQ;
+terminal Integer UINT;
+terminal String ID, WORD;
 
-non terminal HashMap attrib_list;
-non terminal Attrib attrib;
-non terminal Integer point, valutation, scores;
-non terminal String ident, sentence_elem;
-non terminal String NT0;
+non terminal prog, sentence, desc, desc_list, def, def_list;
+non terminal Integer score, score_list;
+non terminal String NT0, ident, sentence_elem;
+non terminal Attrib attr;
+non terminal HashMap attr_list;
+
 
 start with prog;
 
+prog ::= def_list DOT desc_list;
 
 
+def_list ::= def def_list | def;
 
-prog ::= definitions D descriptions;
+def ::= RO attr_list:h RC ARR ident:a {:
+        parser.symbol_table.put(a, h);
+    :};
 
+attr_list ::= attr_list:h CM attr:a {:
+        h.put(a.getName(), a.getWeight());
+        RESULT = h;
+    :}
+    | attr:a {:
+        HashMap h = new HashMap();
+        h.put(a.getName(), a.getWeight());
+        RESULT = h;
+    :};
 
-/////////////////////////////////////////////////////////
-//DEFINITIONS
-/////////////////////////////////////////////////////////
-
-definitions ::=		definitions definition
-		      	|definition
-;
-
-
-definition ::= OB attrib_list:attribHash CB ARROW ident:idName
-{:
-	// The attribute HashMap is completed...
-	// it can be inserted inside the hashTable
-	parser.classHash.put(idName,attribHash);
-:};
-
-
-
-attrib_list ::= attrib_list:attribHash C attrib:attrib
-{:
-	//Insertion of the new attribute inside the attribute HashMap
-        attribHash.put(attrib.name, attrib.weight);
-
-  	RESULT = attribHash;
-:};
+attr ::= ident:a C UINT:b {:
+        RESULT = new Attrib(a, b);
+    :};
 
 
+desc_list ::= desc_list desc 
+    | desc;
 
-attrib_list ::= attrib:attrib  
-{:
-	// A new HashMap is created to insert the attributes
-        HashMap hash = new HashMap();
-	// Current attribute is inserted inside the HashMap
-        hash.put(attrib.getName(), attrib.getWeight());
-	
-	RESULT = hash;	
-:};
+desc ::= ident C score_list:x EQ sentence S {:
+        System.out.println(", " + x);
+    :};
 
-
-attrib ::= 	ident:a DD NUMBER:b {:
-	//Pass an object of the attribute type
-  	RESULT = new Attrib(a,b);
-:};
-
-
-
-
-////////////////////////////////////////////////////////
-//DESCRIPTIONS
-////////////////////////////////////////////////////////
-
-descriptions ::= 	descriptions description   
-			|  
-;
-
-description ::= 	ident DD scores:score EQ sentence SC {:
-	System.out.println(", "+score);
-:};
-
-
-
-// The V terminal has the function of the sum operator
-scores ::= scores:val1 NT0 C valutation:val2
-{: 
- 	//I sum the valuations of the present product
-	RESULT = new Integer(val1.intValue() + val2.intValue()); 
-:};
+score_list ::= score_list:a NT0 CM score:b {:
+        RESULT = a + b;
+    :}
+    | score:x {:
+        RESULT = x;
+    :};
 
 NT0 ::= {: RESULT = (String)parser.stack(-2); :};
 
+score ::= STAR ident:x {:
+        String type_name = (String)parser.stack(-3);
+        HashMap h = (HashMap)parser.symbol_table.get(type_name);
+        Integer w = (Integer)h.get(x);
+        RESULT = 3 * w;
+    :}
+    | PLUS ident:x {:
+        String type_name = (String)parser.stack(-3);
+        HashMap h = (HashMap)parser.symbol_table.get(type_name);
+        Integer w = (Integer)h.get(x);
+        RESULT = 2 * w;
+    :}
+    | DIV ident:x {:
+        String type_name = (String)parser.stack(-3);
+        HashMap h = (HashMap)parser.symbol_table.get(type_name);
+        Integer w = (Integer)h.get(x);
+        RESULT = 1 * w;
+    :}
+    | MIN ident:x {:
+        String type_name = (String)parser.stack(-3);
+        HashMap h = (HashMap)parser.symbol_table.get(type_name);
+        Integer w = (Integer)h.get(x);
+        RESULT = 0 * w;
+    :};
 
+sentence ::= sentence sentence_elem:x {:
+        System.out.print(" " + x);
+    :}
+    | sentence_elem:x{:
+        System.out.print(x);
+    :};
 
+sentence_elem ::= WORD:x {:
+        RESULT = x;
+    :}
+    | UINT:x {:
+        RESULT = x.toString();
+    :};
 
-
-
-scores ::= valutation:val {: RESULT = val; :}
-;
-		
-
-
-
-
-
-valutation ::= point:punt ident:name {:
-	String identClass = (String)parser.stack(-3);
-
-       	//I search inside the hash table the entry related to the current class(identClasse)
-        HashMap hash = (HashMap)parser.classHash.get(identClass);
-
-	//I search inside the hash HashMap the weight associated to the current attribute
-	Integer weight = (Integer)hash.get(name);
-	
-	//Compute the operation
-        RESULT = new Integer(weight.intValue() * punt.intValue());
-:}; 
-
-
-
-
-point ::= 	  STAR 		{: RESULT = new Integer(3); :}
-		 |PLUS 		{: RESULT = new Integer(2); :}
-		 |DIV 		{: RESULT = new Integer(1); :}
-		 |MINUS		{: RESULT = new Integer(0); :}
-;
-
-
-
-
-////////////////////////////////////////////////////////////////
-/////// ELEMENTARY GRAMMAR
-////////////////////////////////////////////////////////////////
-
-sentence ::= 	sentence sentence_elem:name {: System.out.print(" "+name);  :}
-	  	| sentence_elem:name {: System.out.print(name);  :} 
-;
-
-sentence_elem ::= WORD:name {: RESULT = name; :}
-	  	 |NUMBER:num {: RESULT = num.toString();  :}
-; 
-
-
-ident ::= ID:a {: RESULT=a; :} 
-	| WORD:a {: RESULT=a; :}
-;
+ident ::= ID:x {:
+        RESULT = x;
+    :}
+    | WORD:x {:
+        RESULT = x;
+    :};

@@ -2,34 +2,45 @@ import java_cup.runtime.*;
 
 %%
 
+%unicode
 %cup
+%line
+%column
 
-number		=	[0-9]+
-word 		=	[a-zA-Z]+
-comment		=	"//".*
-ident  		=	[_a-zA-Z][_a-zA-Z0-9]*
+%{
+	private Symbol sym(int type) {
+		return new Symbol(type, yyline, yycolumn);
+	}
+	
+	private Symbol sym(int type, Object value) {
+		return new Symbol(type, yyline, yycolumn, value);
+	}
+	
+%}
 
+uint    = 0 | [1-9][0-9]*
+word    = [A-Za-z]+
+id      = [_A-Za-z][_A-Za-z0-9]*
+comment = "//".*
 
 %%
 
-"->"    	{return new Symbol(sym.ARROW); }
-"-"		{return new Symbol(sym.MINUS); }
-"+"		{return new Symbol(sym.PLUS); }
-"/"		{return new Symbol(sym.DIV); }
-"*"		{return new Symbol(sym.STAR); }
-"("		{return new Symbol(sym.OB); }
-")"		{return new Symbol(sym.CB); }
-";"		{return new Symbol(sym.SC); }
-","		{return new Symbol(sym.C); }
-"."		{return new Symbol(sym.D); }
-":"		{return new Symbol(sym.DD); }
-"="		{return new Symbol(sym.EQ); }
+"("                 { return new Symbol(sym.RO, yyline, yycolumn); }
+")"                 { return new Symbol(sym.RC, yyline, yycolumn); }
+":"                 { return new Symbol(sym.C, yyline, yycolumn); }
+"->"                { return new Symbol(sym.ARR, yyline, yycolumn); }
+","                 { return new Symbol(sym.CM, yyline, yycolumn); }
+"."                 { return new Symbol(sym.DOT, yyline, yycolumn); }
+"*"                 { return new Symbol(sym.STAR, yyline, yycolumn); }
+"+"                 { return new Symbol(sym.PLUS, yyline, yycolumn); }
+"/"                 { return new Symbol(sym.DIV, yyline, yycolumn); }
+"-"                 { return new Symbol(sym.MIN, yyline, yycolumn); }
+";"                 { return new Symbol(sym.S, yyline, yycolumn); }
+"="                 { return new Symbol(sym.EQ, yyline, yycolumn); }
+{uint}              { return new Symbol(sym.UINT, yyline, yycolumn, new Integer(yytext())); }
+{word}              { return new Symbol(sym.WORD, yyline, yycolumn, new String(yytext())); }
+{id}                { return new Symbol(sym.ID, yyline, yycolumn, new String(yytext())); }
+{comment}           { ; }
 
-{comment} 	{;}
-{number}	{return new Symbol(sym.NUMBER, new Integer(yytext())); }
-{word}		{return new Symbol(sym.WORD, new String(yytext())); }
-{ident} 	{return new Symbol(sym.ID, new String(yytext())); }
-
-\n|\r|\r\n 	{;}
-[ \t]		{;}
-
+\r|\n|\r\n|" "|\t	{ ; }
+.                   { ; }
