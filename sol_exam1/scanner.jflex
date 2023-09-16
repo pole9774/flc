@@ -43,4 +43,4 @@ comment = "//".*
 {comment}           { ; }
 
 \r|\n|\r\n|" "|\t	{ ; }
-.                   { ; }
+.                   { System.out.println("Scanner Error: " + yytext()); }
