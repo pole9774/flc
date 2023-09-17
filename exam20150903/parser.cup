@@ -1,29 +1,31 @@
 import java_cup.runtime.*;
 import java.util.*;
+import java.io.*;
 
 init with {:
 	symbol_table = new HashMap();
+    System.out.println("Achieved scores:");
 :};
 
 parser code {:
     public static HashMap symbol_table;
-
+    
     public void report_error(String message, Object info) {
         StringBuffer m = new StringBuffer(message);
         if (info instanceof Symbol) {
             if (((Symbol)info).left != 1 && ((Symbol)info).right != 1) {
                 if (((Symbol)info).left != -1 && ((Symbol)info).right != -1) {
-                    int line = (((Symbol)info).left)+1;
-                    int column = (((Symbol)info).right)+1;
-                    m.append(" (line "+line+", column "+column+")");
+                    int line = (((Symbol)info).left) + 1;
+                    int column = (((Symbol)info).right) + 1;
+                    m.append(" (line " + line + " column " + column + ")");
                 }
             }
             System.err.println(m);
         }
     }
-
+    
     public Object stack(int position) {
-        return (((Symbol)stack.elementAt(tos+position)).value);
+        return (((Symbol)stack.elementAt(tos + position)).value);
     }
 :};
 
@@ -40,28 +42,12 @@ action code {:
         String getName(){
             return this.name;
         }
+
         Integer getVal(){
             return this.val;
         }
     };
-    
-    class Times {
-        private String name;
-        private Double val;
-        
-        Times(String name, Double val){
-            this.name = name;
-            this.val = val;
-        }
-	
-        String getName(){
-            return this.name;
-        }
-        Double getVal(){
-            return this.val;
-        }
-    };
-    
+
     class MinMax {
         private Integer min;
         private Integer max;
@@ -74,163 +60,156 @@ action code {:
         Integer getMin(){
             return this.min;
         }
+
         Integer getMax(){
             return this.max;
+        }
+    };
+
+    class Time {
+        private String name;
+        private Float time;
+
+        Time(String name, Float time){
+            this.name = name;
+            this.time = time;
+        }
+
+        String getName(){
+            return this.name;
+        }
+
+        Float getTime(){
+            return this.time;
         }
     };
 :};
 
 
-terminal SEP, TOKEN1, TOKEN2, TOKEN3, QSTRING, UINT, PART, MS, EQ, BO, BC, RO, RC;
-terminal PMM, S, CM, ARROW, PARTSEP, CL, M;
+terminal S, BO, BC, EQ, MS, CM, ARR, RO, RC, PMM, PART, C, PARTSEP, M;
+terminal TOKEN1, TOKEN2, TOKEN3, SEP, QSTRING, UINT;
 
-non terminal prog, header_section, list_token1, cars_section, car_list, car;
-non terminal race_section, pmm_list, pmm, car_name;
-non terminal String NT0;
-non terminal Times drive_stats_list, part, part_list, performance, performance_list;
-non terminal MinMax section_list;
-non terminal Attrib speed;
+non terminal prog, header_section, token1_list, cars_section, car_list, car;
+non terminal race_section, pmm_list, pmm;
 non terminal HashMap speed_list;
+non terminal Attrib speed;
+non terminal MinMax section_list;
+non terminal Time performance_list, performance;
+non terminal String car_name, NT0;
+non terminal Float part_list, part, distance_list;
 
 
 start with prog;
 
-
-prog ::= header_section SEP cars_section SEP race_section
-;
+prog            ::= header_section SEP cars_section SEP race_section;
 
 
-header_section ::= list_token1 TOKEN2 S list_token1 TOKEN3 S list_token1 |
-		 list_token1 TOKEN3 S list_token1 TOKEN2 S list_token1
-;
+header_section  ::= token1_list TOKEN2 S token1_list TOKEN3 S token1_list |
+                    token1_list TOKEN3 S token1_list TOKEN2 S token1_list;
 
-list_token1 ::= list_token1 TOKEN1 S |
-	      /* ε */
-;
+token1_list     ::= token1_list TOKEN1 S |
+                    ;
 
 
-cars_section ::= car_list
-;
+cars_section    ::= car_list;
 
-car_list ::= car_list car car | car car
-;
+car_list        ::= car_list car car |
+                    car car;
 
-car ::= QSTRING:carName BO speed_list:h BC 
-	{:
-		parser.symbol_table.put(carName, h);
-	:}
-;
+car             ::= QSTRING:x BO speed_list:h BC {:
+                        parser.symbol_table.put(x, h);
+                    :};
 
-speed_list ::= speed_list:h CM speed:x 
-	       {:
-	       		h.put(x.getName(), x.getVal());
-	       		RESULT = h;
-	       :} | 
-	       speed:x
-	       {: 
-	       		HashMap hash = new HashMap();
-	       		hash.put(x.getName(), x.getVal());
-	       		RESULT = hash;
-	       :}
-;
+speed_list      ::= speed_list:h CM speed:x {:
+                        h.put(x.getName(), x.getVal());
+                        RESULT = h;
+                    :} |
+                    speed:x {:
+                        HashMap h = new HashMap();
+                        h.put(x.getName(), x.getVal());
+                        RESULT = h;
+                    :};
 
-speed ::= QSTRING:x EQ UINT:y MS
-	  {:
-	  	RESULT = new Attrib((String)x, (Integer)y);
-	  :}
-;
+speed           ::= QSTRING:x EQ UINT:y MS {:
+                        RESULT = new Attrib((String)x, (Integer)y);
+                    :};
 
 
-race_section ::= pmm_list performance_list:x 
-		 {:
-		 	System.out.println("WINNER: " + x.getName() + " " + x.getVal() + " s");
-		 :}
-;
+race_section    ::= pmm_list performance_list:t {:
+                        System.out.println("WINNER: " + t.getName() + " " + t.getTime());
+                    :};
 
-pmm_list ::= pmm_list pmm | 
-	     /* ε */
-;
+pmm_list        ::= pmm_list pmm |
+                    ;
 
-pmm ::= PMM RO QSTRING:x RC RO section_list:y RC S 
-	{:
-		System.out.println(x + " -> MIN: " + y.getMin() + " MAX: " + y.getMax());
-	:}
-;
+pmm             ::= PMM RO QSTRING RC RO section_list:m RC S {:
+                        System.out.println("MIN: " + m.getMin() + " MAX: " + m.getMax());
+                    :};
 
-section_list ::= section_list:x CM QSTRING:y
-		 {:
-		 	String carName = (String)parser.stack(-5);
-		 	HashMap h = (HashMap)parser.symbol_table.get(carName);
-		 	Integer carSpeed = (Integer)h.get(y);
-		 	
-		 	if(carSpeed < x.getMin())
-		 		RESULT = new MinMax(carSpeed, x.getMax());
-		 	else if(carSpeed > x.getMax())
-		 		RESULT = new MinMax(x.getMin(), carSpeed);
-		 	else
-		 		RESULT = new MinMax(x.getMin(), x.getMax());
-		 :} | 
-		 QSTRING:x
-		 {:
-		 	String carName = (String)parser.stack(-3);
-		 	HashMap h = (HashMap)parser.symbol_table.get(carName);
-		 	Integer res = (Integer)h.get(x);
-		 	RESULT = new MinMax(res, res);
-		 :}
-;
+section_list    ::= section_list:m CM QSTRING:x {:
+                        String carName = (String)parser.stack(-5);
+                        HashMap h = (HashMap)parser.symbol_table.get(carName);
+                        Integer speed = (Integer)h.get(x);
+                        if (speed < m.getMin()) {
+                            RESULT = new MinMax(speed, m.getMax());
+                        } else if (speed > m.getMax()) {
+                            RESULT = new MinMax(m.getMin(), speed);
+                        } else {
+                            RESULT = new MinMax(m.getMin(), m.getMax());
+                        }
+                    :} |
+                    QSTRING:x {:
+                        String carName = (String)parser.stack(-3);
+                        HashMap h = (HashMap)parser.symbol_table.get(carName);
+                        Integer speed = (Integer)h.get(x);
+                        RESULT = new MinMax(speed, speed);
+                    :};
 
-performance_list ::= performance_list:x performance:y 
-		     {:
-		     	if(x.getVal() <= y.getVal())
-		     		RESULT = new Times(x.getName(), x.getVal());
-		     	else
-		     		RESULT = new Times(y.getName(), y.getVal());
-		     :} |
-		     performance:x {: RESULT = new Times(x.getName(), x.getVal()); :}
-;
+performance_list    ::= performance_list:x performance:y {:
+                            if (x.getTime() < y.getTime()) {
+                                RESULT = new Time(x.getName(), x.getTime());
+                            } else {
+                                RESULT = new Time(y.getName(), y.getTime());
+                            }
+                        :} |
+                        performance:t {:
+                            RESULT = new Time(t.getName(), t.getTime());
+                        :};
 
-performance ::= car_name ARROW part_list:x S 
-		{:
-			System.out.println("TOTAL: " + x.getVal() + " s");
-			RESULT = new Times(x.getName(), x.getVal());
-		:}
-;
+performance         ::= car_name:n ARR part_list:t S {:
+                            RESULT = new Time(n, t);
+                        :};
 
-car_name ::= QSTRING:n {: System.out.println(n); RESULT = n; :}
-;
+car_name            ::= QSTRING:n {:
+                            System.out.println(n);
+                            RESULT = (String)n;
+                        :};
 
-part_list ::= part_list:x NT0 PARTSEP part:y 
-	      {: 
-	      	RESULT = new Times(x.getName(), x.getVal()+y.getVal());
-	      :} | 
-	      part:x {: RESULT = new Times(x.getName(), x.getVal()); :}
-;
+part_list           ::= part_list:x NT0 PARTSEP part:t {:
+                            RESULT = x + t;
+                        :} |
+                        part:t {:
+                            RESULT = t;
+                        :};
 
-part ::= PART UINT:x CL drive_stats_list:t 
-	 {:
-	 	System.out.println("PART" + x + ": " + t.getVal() + " s");
-	 	RESULT = new Times(t.getName(), t.getVal());
-	 :}
-;
+part                ::= PART UINT:n C distance_list:t {:
+                            System.out.println("PART" + n + ": " + t + "s");
+                            RESULT = t;
+                        :};
 
-drive_stats_list ::= drive_stats_list:t CM QSTRING:x UINT:y M 
-		     {:
-		     	String carName = (String)parser.stack(-9);
-		 	HashMap h = (HashMap)parser.symbol_table.get(carName);
-		 	RESULT = new Times(carName, ((double) ((Integer)y / (Integer)h.get(x) + t.getVal())));
-		     :} | 
-		     QSTRING:x UINT:y M
-		     {:
-		     	String carName = (String)parser.stack(-7);
-		 	HashMap h = (HashMap)parser.symbol_table.get(carName);
-		 	RESULT = new Times(carName, (double) ((Integer)y / (Integer)h.get(x)));
-		     :}
-;
+distance_list       ::= distance_list:t CM QSTRING:s UINT:x M {:
+                            String carName = (String)parser.stack(-9);
+                            HashMap h = (HashMap)parser.symbol_table.get(carName);
+                            Integer speed = (Integer)h.get(s);
+                            RESULT = (Integer)x / (float)speed + t;
+                        :} |
+                        QSTRING:s UINT:x M {:
+                            String carName = (String)parser.stack(-7);
+                            HashMap h = (HashMap)parser.symbol_table.get(carName);
+                            Integer speed = (Integer)h.get(s);
+                            RESULT = (Integer)x / (float)speed;
+                        :};
 
-NT0 ::= {: RESULT = (String)parser.stack(-2); :}
-;
-
-
-
-
-
+NT0                 ::= {:
+                            RESULT = (String)parser.stack(-2);
+                        :};
