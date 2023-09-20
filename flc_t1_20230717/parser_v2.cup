@@ -1,0 +1,174 @@
+import java_cup.runtime.*;
+import java.util.*;
+import java.io.*;
+
+init with {:
+	symbol_table = new HashMap();
+:};
+
+parser code {:
+    public static HashMap symbol_table;
+    
+    public void report_error(String message, Object info) {
+        StringBuffer m = new StringBuffer(message);
+        if (info instanceof Symbol) {
+            if (((Symbol)info).left != 1 && ((Symbol)info).right != 1) {
+                if (((Symbol)info).left != -1 && ((Symbol)info).right != -1) {
+                    int line = (((Symbol)info).left) + 1;
+                    int column = (((Symbol)info).right) + 1;
+                    m.append(" (line " + line + " column " + column + ")");
+                }
+            }
+            System.err.println(m);
+        }
+    }
+    
+    public Object stack(int position) {
+        return (((Symbol)stack.elementAt(tos + position)).value);
+    }
+:};
+
+action code {:
+    class Attrib {
+        private String name;
+        private Float val;
+        
+        Attrib(String name, Float val){
+            this.name = name;
+            this.val = val;
+        }
+	
+        String getName(){
+            return this.name;
+        }
+
+        Float getVal(){
+            return this.val;
+        }
+    };
+
+    class Item {
+        private Integer qnt;
+        private Float price;
+        
+        Item(Integer qnt, Float price){
+            this.qnt = qnt;
+            this.price = price;
+        }
+	
+        Integer getQnt(){
+            return this.qnt;
+        }
+
+        Float getPrice(){
+            return this.price;
+        }
+    };
+:};
+
+
+terminal S, SEP, MIN, CM, EURO, PERC, TOKEN1, TOKEN2, TOKEN3;
+terminal String QSTRING;
+terminal Float REALNUM;
+terminal Integer UINT;
+
+non terminal prog, header_section, header1, token1_list, token2_list, token2_rep, header2;
+non terminal token_rep, dresses_section, dresses_list, dress, shopping_section, purch_list;
+non terminal purch, prod_name;
+non terminal HashMap prod_list;
+non terminal Attrib prod;
+non terminal Item item_list, item;
+non terminal Integer NT0;
+non terminal String NT1;
+
+
+start with prog;
+
+prog            ::= header_section SEP dresses_section SEP shopping_section;
+
+
+header_section  ::= header1 |
+                    header2;
+
+header1         ::= token1_list token2_list;
+
+token1_list     ::= token1_list TOKEN1 S TOKEN1 S |
+                    TOKEN1 S TOKEN1 S TOKEN1 S;
+
+token2_list     ::= token2_rep |
+                    token2_rep token2_rep token2_rep |
+                    token2_rep token2_rep token2_rep TOKEN2 S;
+
+token2_rep      ::= TOKEN2 S TOKEN2 S TOKEN2 S;
+
+header2         ::= TOKEN2 S token_rep TOKEN2 S token_rep;
+
+token_rep       ::= token_rep TOKEN1 S |
+                    token_rep TOKEN3 S |
+                    ;
+
+
+dresses_section ::= dresses_list;
+
+dresses_list    ::= dresses_list dress dress |
+                    dress dress dress;
+
+dress           ::= QSTRING:n MIN prod_list:h S {:
+                        parser.symbol_table.put((String)n, h);
+                    :};
+
+prod_list       ::= prod_list:h CM prod:p {:
+                        h.put(p.getName(), p.getVal());
+                        RESULT = h;
+                    :} |
+                    prod:p {:
+                        HashMap h = new HashMap();
+                        h.put(p.getName(), p.getVal());
+                        RESULT = h;
+                    :};
+
+prod            ::= UINT QSTRING:n REALNUM:p EURO {:
+                        RESULT = new Attrib((String)n, (Float)p);
+                    :};
+
+
+shopping_section    ::= purch_list;
+
+purch_list          ::= purch_list purch |
+                        purch;
+
+purch               ::= prod_name UINT NT1 NT0 PERC MIN item_list:x S {:
+                            System.out.println("TOTAL: " + x.getPrice() + " euro N_PROD: " + x.getQnt());
+                        :};
+
+prod_name           ::= QSTRING:x {:
+                            System.out.println((String)x);
+                            RESULT = (String)x;
+                        :};
+
+item_list           ::= item_list:x CM item:y {:
+                            RESULT = new Item(x.getQnt() + y.getQnt(), x.getPrice() + y.getPrice());
+                        :} |
+                        item:x {:
+                            RESULT = new Item(x.getQnt(), x.getPrice());
+                        :};
+
+item                ::= QSTRING:n UINT:q {:
+                            String prodName = (String)parser.stack(-7);
+                            Integer perc = (Integer)parser.stack(-6);
+                            String itemName = (String)n;
+                            Integer qnt = (Integer)q;
+                            HashMap h = (HashMap)parser.symbol_table.get(prodName);
+                            Float price = (Float)h.get(itemName) * qnt * perc / 100;
+                            System.out.println(itemName + " " + price + " euro");
+                            RESULT = new Item(qnt, price);
+                        :};
+
+NT0                 ::= {:
+                            RESULT = (Integer)parser.stack(-1);
+                        :};
+
+NT1                 ::= {:
+                            RESULT = (String)parser.stack(-1);
+                        :};
+                        
