@@ -1,0 +1,162 @@
+/*************************
+ Parser
+**************************/
+
+import java_cup.runtime.*;
+import java.util.*;
+import java.io.*;
+
+
+parser code 	{:
+    
+    public void report_error(String message, Object info) {
+        StringBuffer m = new StringBuffer(message);
+        if (info instanceof Symbol) {
+            if (((Symbol)info).left != 1 && ((Symbol)info).right != 1) {
+                if (((Symbol)info).left != -1 && ((Symbol)info).right != -1) {
+                    int line = (((Symbol)info).left) + 1;
+                    int column = (((Symbol)info).right) + 1;
+                    m.append(" (line " + line + " column " + column + ")");
+                }
+            }
+            System.err.println(m);
+        }
+    }
+    
+    public Object stack(int position) {
+        return (((Symbol)stack.elementAt(tos + position)).value);
+    }
+:};
+
+action code {:
+    class Attrib {
+        private Integer x;
+        private Integer y;
+        
+        Attrib(Integer x, Integer y){
+            this.x = x;
+            this.y = y;
+        }
+	
+        Integer getX(){
+            return this.x;
+        }
+
+        Integer getY(){
+            return this.y;
+        }
+    };
+:};
+
+//////////////////////////////////
+///// SYMBOLS DECLARATION
+/////////////////////////////////
+
+terminal TOKEN1, TOKEN2, TOKEN3, SO, SC, RO, RC, CM, PLUS, MIN, STAR, DIV, INS, CMP, SUM, S, SEP;
+terminal Integer UINT;
+
+non terminal prog, header_section, token3_rep, commands_section;
+non terminal Attrib command_list;
+non terminal Integer command, expr_list, expr, op_list, NT0, NT1;
+
+precedence left MIN, PLUS;
+precedence left DIV, STAR;
+
+//////////////////////////////////
+///// GRAMMAR
+/////////////////////////////////
+
+start with prog;
+
+prog            ::= header_section SEP commands_section;
+
+
+header_section  ::= token3_rep TOKEN2 S token3_rep TOKEN1 S token3_rep TOKEN2 S token3_rep |
+                    token3_rep TOKEN2 S token3_rep TOKEN2 S token3_rep TOKEN1 S token3_rep |
+                    token3_rep TOKEN1 S token3_rep TOKEN2 S token3_rep TOKEN2 S token3_rep |
+                    token3_rep TOKEN2 S token3_rep TOKEN1 S token3_rep |
+                    token3_rep TOKEN1 S token3_rep TOKEN2 S token3_rep;
+
+token3_rep      ::= token3_rep TOKEN3 S |
+                    ;
+
+
+commands_section    ::= command_list;
+
+command_list        ::= command_list NT0 NT1 command:x command:y {:
+                            RESULT = new Attrib(x, y);
+                        :} |
+                        command command command:x command:y {:
+                            RESULT = new Attrib(x, y);
+                        :};
+
+NT1                 ::= {:
+                            Attrib a = (Attrib)parser.stack(-1);
+                            RESULT = a.getY();
+                        :};
+
+NT0                 ::= {:
+                            Attrib a = (Attrib)parser.stack(0);
+                            RESULT = a.getX();
+                        :};
+
+command             ::= INS expr:x S {:
+                            System.out.println(x);
+                            RESULT = x;
+                        :} |
+                        CMP expr:x CM expr:y S {:
+                            Integer a = (Integer)parser.stack(-6);
+                            Integer b = (Integer)parser.stack(-5);
+                            if (a.equals(b)) {
+                                System.out.println(x);
+                                RESULT = x;
+                            } else {
+                                System.out.println(y);
+                                RESULT = y;
+                            }
+                        :} |
+                        CMP expr:x S {:
+                            Integer a = (Integer)parser.stack(-4);
+                            Integer b = (Integer)parser.stack(-3);
+                            if (a.equals(b)) {
+                                System.out.println(x);
+                                RESULT = x;
+                            } else {
+                                System.out.println(0);
+                                RESULT = 0;
+                            }
+                        :} |
+                        SUM expr_list:x S {:
+                            System.out.println(x);
+                            RESULT = x;
+                        :};
+
+expr_list           ::= expr_list:y CM expr:x {:
+                            RESULT = x + y;
+                        :} |
+                        expr:x {:
+                            RESULT = x;
+                        :};
+
+expr                ::= SO op_list:x SC {:
+                            RESULT = x;
+                        :};
+
+op_list             ::= op_list:x PLUS op_list:y {:
+                            RESULT = x + y;
+                        :} |
+                        op_list:x MIN op_list:y {:
+                            RESULT = x - y;
+                        :} |
+                        op_list:x STAR op_list:y {:
+                            RESULT = x * y;
+                        :} |
+                        op_list:x DIV op_list:y {:
+                            RESULT = x / y;
+                        :} |
+                        RO op_list:x RC {:
+                            RESULT = x;
+                        :} |
+                        UINT:x {:
+                            RESULT = x;
+                        :};
